@@ -1,7 +1,9 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-import uuid # For generating unique IDs
+import uuid
+import json
+import os
 from database import TicketDB
 from analyzer import TicketAnalyzer
 
@@ -9,29 +11,60 @@ from analyzer import TicketAnalyzer
 st.set_page_config(page_title="Ticket Analyzer", layout="wide")
 st.title("🤖 Smart Customer Support Analyzer")
 
-# Initialize Logic Classes
+# Initialize Logic
 db = TicketDB()
 analyzer = TicketAnalyzer()
+
+# --- AUTO-LOAD DATA LOGIC ---
+# We check if the DB is empty on launch. If so, we load the JSON.
+def init_db():
+    db.connect()
+    db.create_table()
+    
+    # Check count
+    try:
+        count = db.cursor.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
+        if count == 0:
+            # DB is empty! Load JSON.
+            if os.path.exists("data/tickets.json"):
+                with open("data/tickets.json", 'r') as f:
+                    tickets = json.load(f)
+                
+                for t in tickets:
+                    # Provide default content if missing
+                    content = t.get("content", "")
+                    
+                    # Analyze if not already analyzed
+                    if "category" not in t or "priority" not in t:
+                        cat, prio = analyzer.analyze_ticket(content)
+                        t['category'] = cat
+                        t['priority'] = prio
+                    
+                    db.insert_ticket(t)
+                st.toast(f"🎉 loaded {len(tickets)} demo tickets from JSON!")
+    except Exception as e:
+        st.error(f"Error initializing DB: {e}")
+    finally:
+        db.close()
+
+# Run initialization once
+init_db()
+
 
 # --- SIDEBAR: INPUT & ACTIONS ---
 st.sidebar.header("📝 Submit New Ticket")
 
-# 1. The Input Form
 with st.sidebar.form("ticket_form"):
     customer_name = st.text_input("Customer Name", placeholder="e.g. John Doe")
-    issue_content = st.text_area("Issue Description", placeholder="e.g. I can't login to the portal...")
+    issue_content = st.text_area("Issue Description", placeholder="e.g. I can't login...")
     submitted = st.form_submit_button("🚀 Submit Ticket")
 
     if submitted:
         if customer_name and issue_content:
-            # A. Analyze it live
             cat, prio = analyzer.analyze_ticket(issue_content)
             
-            # B. Save to DB
             db.connect()
-            db.create_table()
             new_id = f"TICKET-{str(uuid.uuid4())[:8].upper()}"
-            
             record = {
                 "id": new_id,
                 "customer": customer_name,
@@ -43,25 +76,15 @@ with st.sidebar.form("ticket_form"):
             db.insert_ticket(record)
             db.close()
             
-            # C. Show Success Message
             st.success(f"Ticket Created! ID: {new_id}")
-            st.info(f"Analysis Result: [{cat.upper()}] with {prio.upper()} Priority")
+            # Rerun so the charts update immediately
+            st.rerun()
         else:
             st.error("Please fill in both fields.")
 
-st.sidebar.markdown("---")
-
-# 2. Reload Button (Still useful for bulk updates)
-if st.sidebar.button("🔄 Refresh Data"):
-    st.rerun()
-
 # --- MAIN PAGE: DASHBOARD ---
-
-# We reuse the logic to display data
 conn = sqlite3.connect("tickets.db")
 
-# 1. High Level Metrics
-# We handle the case where DB might be empty first
 try:
     total = conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
 except:
@@ -75,12 +98,10 @@ else:
     col1.metric("Total Tickets", total)
     col2.metric("Urgent Issues", urgent, delta_color="inverse")
 
-    # 2. Charts
     st.subheader("📊 Analytics Overview")
     c1, c2 = st.columns(2)
 
     df_priority = pd.read_sql("SELECT priority, COUNT(*) as count FROM tickets GROUP BY priority", conn)
-    # Basic check to avoid error if empty
     if not df_priority.empty:
         c1.bar_chart(df_priority.set_index("priority"))
 
@@ -88,11 +109,8 @@ else:
     if not df_category.empty:
         c2.bar_chart(df_category.set_index("category"))
 
-    # 3. Interactive Data Explorer
     st.subheader("🔎 Ticket Explorer")
-    
-    # Simple search filter
-    search_term = st.text_input("Search for keywords (e.g. 'billing')")
+    search_term = st.text_input("Search for keywords")
     
     query = "SELECT * FROM tickets"
     params = []
