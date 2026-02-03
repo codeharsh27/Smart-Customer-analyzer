@@ -5,33 +5,32 @@ class Reporter:
         self.db = TicketDB()
     
     def generate_report(self):
-        """Runs SQL queries to find insights."""
+        """Generates a statistical summary of the ticket database."""
         self.db.connect()
         
-        print("\n========== SUPPORT TEAM REPORT ==========")
-        
-        # Insight 1: Total Ticket Count
-        # COUNT(*): A standard SQL function to count rows
-        count = self.db.cursor.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
-        print(f"Total Tickets: {count}")
-        
-        # Insight 2: Tickets by Priority
-        # GROUP BY: Groups rows that have the same value in 'priority'
-        print("\n--- Tickets by Priority ---")
-        sql_priority = "SELECT priority, COUNT(*) FROM tickets GROUP BY priority"
-        results = self.db.cursor.execute(sql_priority).fetchall()
-        for priority, count in results:
-            print(f"- {priority.upper()}: {count}")
+        try:
+            print("\n[ Database Summary ]")
             
-        # Insight 3: Tickets by Category
-        print("\n--- Tickets by Category ---")
-        sql_category = "SELECT category, COUNT(*) FROM tickets GROUP BY category"
-        results = self.db.cursor.execute(sql_category).fetchall()
-        for category, count in results:
-            print(f"- {category.title()}: {count}")
+            # Total Count
+            count = self.db.cursor.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
+            print(f"Total Records: {count}")
             
-        print("=========================================")
-        self.db.close()
+            # Priority Breakdown
+            print("\nPriority Distribution:")
+            priorities = self.db.cursor.execute("SELECT priority, COUNT(*) FROM tickets GROUP BY priority").fetchall()
+            for priority, count in priorities:
+                print(f"  {priority.title()}: {count}")
+                
+            # Category Breakdown
+            print("\nCategory Distribution:")
+            categories = self.db.cursor.execute("SELECT category, COUNT(*) FROM tickets GROUP BY category").fetchall()
+            for category, count in categories:
+                print(f"  {category.title()}: {count}")
+                
+        except Exception as e:
+            print(f"Error generating report: {e}")
+        finally:
+            self.db.close()
 
 if __name__ == "__main__":
     reporter = Reporter()

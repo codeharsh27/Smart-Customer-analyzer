@@ -7,57 +7,47 @@ import os
 from database import TicketDB
 from analyzer import TicketAnalyzer
 
-# --- SETUP & CONFIG ---
-st.set_page_config(page_title="Ticket Analyzer", layout="wide")
-st.title("🤖 Smart Customer Support Analyzer")
+# --- Configuration ---
+st.set_page_config(page_title="Ticket Analyzer Dashboard", layout="wide")
+st.title("Customer Support Ticket Analyzer")
 
-# Initialize Logic
+# --- Initialization ---
 db = TicketDB()
 analyzer = TicketAnalyzer()
 
-# --- AUTO-LOAD DATA LOGIC ---
-# We check if the DB is empty on launch. If so, we load the JSON.
-def init_db():
+def initialize_database():
+    """Checks database state and seeds initial data if empty."""
     db.connect()
     db.create_table()
     
-    # Check count
     try:
         count = db.cursor.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
-        if count == 0:
-            # DB is empty! Load JSON.
-            if os.path.exists("data/tickets.json"):
-                with open("data/tickets.json", 'r') as f:
-                    tickets = json.load(f)
-                
-                for t in tickets:
-                    # Provide default content if missing
-                    content = t.get("content", "")
-                    
-                    # Analyze if not already analyzed
-                    if "category" not in t or "priority" not in t:
-                        cat, prio = analyzer.analyze_ticket(content)
-                        t['category'] = cat
-                        t['priority'] = prio
-                    
-                    db.insert_ticket(t)
-                st.toast(f"🎉 loaded {len(tickets)} demo tickets from JSON!")
+        if count == 0 and os.path.exists("data/tickets.json"):
+            with open("data/tickets.json", 'r') as f:
+                tickets = json.load(f)
+            
+            for t in tickets:
+                content = t.get("content", "")
+                if "category" not in t or "priority" not in t:
+                    cat, prio = analyzer.analyze_ticket(content)
+                    t['category'] = cat
+                    t['priority'] = prio
+                db.insert_ticket(t)
+            st.info(f"Initialized database with {len(tickets)} sample records.")
     except Exception as e:
-        st.error(f"Error initializing DB: {e}")
+        st.error(f"Database initialization error: {e}")
     finally:
         db.close()
 
-# Run initialization once
-init_db()
+initialize_database()
 
-
-# --- SIDEBAR: INPUT & ACTIONS ---
-st.sidebar.header("📝 Submit New Ticket")
+# --- Sidebar: Data Entry ---
+st.sidebar.header("Submit Ticket")
 
 with st.sidebar.form("ticket_form"):
-    customer_name = st.text_input("Customer Name", placeholder="e.g. John Doe")
-    issue_content = st.text_area("Issue Description", placeholder="e.g. I can't login...")
-    submitted = st.form_submit_button("🚀 Submit Ticket")
+    customer_name = st.text_input("Customer Name")
+    issue_content = st.text_area("Description")
+    submitted = st.form_submit_button("Submit")
 
     if submitted:
         if customer_name and issue_content:
@@ -76,43 +66,49 @@ with st.sidebar.form("ticket_form"):
             db.insert_ticket(record)
             db.close()
             
-            st.success(f"Ticket Created! ID: {new_id}")
-            # Rerun so the charts update immediately
+            st.success(f"Ticket {new_id} created successfully.")
             st.rerun()
         else:
-            st.error("Please fill in both fields.")
+            st.error("All fields are required.")
 
-# --- MAIN PAGE: DASHBOARD ---
+# --- Main Dashboard ---
 conn = sqlite3.connect("tickets.db")
 
+# Metrics Section
 try:
     total = conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
-except:
+except sqlite3.OperationalError:
     total = 0
 
-if total == 0:
-    st.warning("No data found! Use the sidebar to add a ticket.")
-else:
-    col1, col2, col3 = st.columns(3)
+if total > 0:
+    col1, col2 = st.columns(2)
     urgent = conn.execute("SELECT COUNT(*) FROM tickets WHERE priority='high'").fetchone()[0]
     col1.metric("Total Tickets", total)
-    col2.metric("Urgent Issues", urgent, delta_color="inverse")
+    col2.metric("High Priority", urgent)
 
-    st.subheader("📊 Analytics Overview")
+    st.divider()
+
+    # Visualizations
+    st.subheader("Analytics Overview")
     c1, c2 = st.columns(2)
 
     df_priority = pd.read_sql("SELECT priority, COUNT(*) as count FROM tickets GROUP BY priority", conn)
     if not df_priority.empty:
+        c1.write("**Priority Distribution**")
         c1.bar_chart(df_priority.set_index("priority"))
 
     df_category = pd.read_sql("SELECT category, COUNT(*) as count FROM tickets GROUP BY category", conn)
     if not df_category.empty:
+        c2.write("**Category Distribution**")
         c2.bar_chart(df_category.set_index("category"))
 
-    st.subheader("🔎 Ticket Explorer")
-    search_term = st.text_input("Search for keywords")
+    st.divider()
+
+    # Data Table
+    st.subheader("Ticket Explorer")
+    search_term = st.text_input("Search Tickets", placeholder="Enter keywords...")
     
-    query = "SELECT * FROM tickets"
+    query = "SELECT id, customer, priority, category, status, content FROM tickets"
     params = []
     
     if search_term:
@@ -121,5 +117,8 @@ else:
         
     df_tickets = pd.read_sql(query, conn, params=params)
     st.dataframe(df_tickets, use_container_width=True, hide_index=True)
+
+else:
+    st.info("No tickets found. Submit a new ticket from the sidebar to begin.")
 
 conn.close()

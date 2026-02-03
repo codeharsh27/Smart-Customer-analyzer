@@ -1,47 +1,50 @@
 class TicketAnalyzer:
     def __init__(self):
+        """
+        Initialize the TicketAnalyzer with predefined keyword rules for categorization and prioritization.
+        """
         self.categories = {
             "billing": ["bill", "payment", "charge", "cost", "invoice", "price"],
-            "technical": ["crash", "error", "bug", "fail", "broken", "screen"],
-            "access": ["login", "password", "reset", "email", "account"],
-            "feature_request": ["add", "feature", "request", "change", "new"]
+            "technical": ["crash", "error", "bug", "fail", "broken", "screen", "glitch"],
+            "access": ["login", "password", "reset", "email", "account", "auth"],
+            "feature_request": ["add", "feature", "request", "change", "new", "enhance"]
         }
         
         self.priorities = {
-            "high": ["crash", "immediate", "urgent", "critical", "money", "payment"],
-            "medium": ["login", "password", "bug", "error"],
-            "low": ["feature", "question", "how to", "color"]
+            "high": ["crash", "immediate", "urgent", "critical", "blocking", "outage"],
+            "medium": ["login", "password", "bug", "error", "fail"],
+            "low": ["feature", "question", "how to", "color", "typo"]
         }
 
     def analyze_ticket(self, content):
-        """Analyze the text and return (Category, Priority)."""
-        # DEFENSIVE CODING: Check if content is None or not a string
+        """
+        Analyze the ticket content to determine category and priority based on keyword heuristics.
+
+        Args:
+            content (str): The text content of the ticket.
+
+        Returns:
+            tuple: (category, priority)
+        """
         if not content or not isinstance(content, str):
-            return "unknown", "low"
+            return "general", "low"
             
-        content = content.lower() 
+        content_lower = content.lower() 
         
         assigned_category = "general"
         assigned_priority = "low"
         
-        # 1. Determine Category
+        # Determine Category
         for category, keywords in self.categories.items():
-            for word in keywords:
-                if word in content:
-                    assigned_category = category
-                    break 
-            if assigned_category != "general":
+            if any(word in content_lower for word in keywords):
+                assigned_category = category
                 break
                 
-        # 2. Determine Priority
-        found_priority = False
+        # Determine Priority
+        # Check priorities in specific order: High -> Medium -> Low (default)
         for priority, keywords in self.priorities.items():
-            for word in keywords:
-                if word in content:
-                    assigned_priority = priority
-                    found_priority = True
-                    break
-            if found_priority:
+            if any(word in content_lower for word in keywords):
+                assigned_priority = priority
                 break
                 
         return assigned_category, assigned_priority
