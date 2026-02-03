@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database (We don't want to push the local DB, we want the cloud to build a new one)
+tickets.db
+
+# Virtual Environment
+venv/
+env/

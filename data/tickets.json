@@ -1,0 +1,31 @@
+[
+    {
+        "id": "TICKET-001",
+        "customer": "Alice Smith",
+        "content": "I cannot login to my account. It keeps saying 'Invalid Password' even though I just reset it.",
+        "status": "open"
+    },
+    {
+        "id": "TICKET-002",
+        "customer": "Bob Jones",
+        "content": "The application crashes immediately when I try to export the PDF report.",
+        "status": "new"
+    },
+    {
+        "id": "TICKET-003",
+        "customer": "Charlie Day",
+        "content": "I have a question about my billing statement for March. It seems too high.",
+        "status": "new"
+    },
+    {
+        "id": "TICKET-005",
+        "customer": "Hacker",
+        "status": "open"
+    },
+    {
+        "id": "TICKET-004",
+        "customer": "Dana White",
+        "content": "Feature request: Can you add a dark mode?",
+        "status": "open"
+    }
+]

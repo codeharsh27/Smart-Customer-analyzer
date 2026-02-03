@@ -1,0 +1,6 @@
+streamlit
+pandas
+# We don't strictly need these for the Streamlit app, 
+# but good to have if you run the API too.
+fastapi
+uvicorn
